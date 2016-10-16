@@ -1,0 +1,116 @@
+alias physicalSP S0;
+alias sysCallNo S1;
+alias filename S2;
+
+physicalSP = [PTBR+2*(SP/512)]*512 + (SP%512);
+sysCallNo = [physicalSP - 1];
+
+
+if(sysCallNo == 2) then
+	filename = [physicalSP - 3];
+	alias i S3;
+	alias fatindex S4;
+	i = 0;
+	while(i<512) do //check if the file is present in the FAT
+		if([FAT + i] == filename) then
+			fatindex = i/8;
+			break;
+		endif;
+		i = i + 8;
+	endwhile;
+	
+	if(i==512) then //if the file isn't found, return error
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+
+	i = 0;
+	alias sysindex S5;
+	sysindex = -1;
+	while(i < 128) do //check if the file has been opened already in the sys-wide open file table
+		if([FILE_TABLE + i] == fatindex) then
+			sysindex = i/2;
+			break;
+		endif;
+		i = i + 2;
+	endwhile;
+	
+	if(sysindex == -1) then //no entry found, create one
+		i = 0;
+		while(i<128) do
+			if([FILE_TABLE + i] == -1) then
+				sysindex = i/2;
+				break;
+			endif;
+			i = i + 2;
+		endwhile;
+	endif;
+		
+	
+	if(sysindex == -1) then //no free space
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+
+	alias PID S6;
+	PID = (PTBR - 1024)/8;
+	alias PCB S7;
+	PCB = READY_LIST + 32*PID;
+	alias ppentry S8;	
+	ppentry = -1;
+
+	i = 0;
+	while(i<16) do //search for a free per-process open file table entry
+		if([PCB + 15 + i] == -1) then
+			ppentry = i/2;
+			break;
+		endif;
+		i = i + 2;
+	endwhile;
+
+	if(ppentry == -1) then
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+	
+	[PCB + 15 + ppentry*2 + 0] = sysindex; //set the values in the per process open file table
+	[PCB + 15 + ppentry*2 + 1] = 0;
+	
+	[FILE_TABLE + sysindex*2 + 0] = fatindex; //set the values in the system wide open file table
+	[FILE_TABLE + sysindex*2 + 1] = [FILE_TABLE + sysindex*2 + 1] + 1;
+
+	[physicalSP - 2] = ppentry;
+	ireturn;
+endif;
+
+if(sysCallNo == 3) then
+	alias filedescriptor S2;
+	filedescriptor = [physicalSP - 3];
+	
+	if(filedescriptor<0 || filedescriptor>7) then //not a valid entry in the per process open file table
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+
+	alias PID S3;
+	PID = (PTBR - 1024)/8;
+	alias PCB S4;
+	PCB = READY_LIST + 32*PID;
+	if([PCB + 15 + 2*filedescriptor] == -1) then //invalid entry in the per process open file table
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+	
+	alias sysindex S5;
+	sysindex = [PCB + 15 + filedescriptor*2];
+	[FILE_TABLE + sysindex*2 + 1] = [FILE_TABLE + sysindex*2 + 1] - 1; //decrement the file open count in the system wide open file table
+	if([FILE_TABLE + sysindex*2 + 1] == 0) then //if the count becomes 0, invalidate the entry
+		[FILE_TABLE + sysindex*2 + 0] = -1;
+	endif;
+	
+	[PCB + 15 + filedescriptor*2 + 0] = -1; //invalidate the entry in the per process open file table
+	[PCB + 15 + filedescriptor*2 + 1] = -1;
+	[physicalSP - 2] = 0; //success
+	ireturn;
+
+endif;

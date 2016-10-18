@@ -5,21 +5,8 @@ load(24,18);
 
 [READY_LIST + 0] = 0; //set pid of the init process to 0
 
-//load(25,21); //load the code of the init program
-//load(26,22);
-//load(27,23); 
-
 PTBR = 1024; //Since init process has pid 0, its ptbr is set to 1024
 PTLR = 4; //Every process has 4 entries in its page table
-
-//[PTBR + 0] = 25; //Physical page number for logical page 0
-//[PTBR + 1] = "01"; //auxilary info for logical page 0
-//[PTBR + 2] = 26;
-//[PTBR + 3] = "01";
-//[PTBR + 4] = 27;
-//[PTBR + 5] = "01";
-//[PTBR + 6] = 28; //for the stack
-//[PTBR + 7] = "01";
 
 [PTBR + 0] = 21;
 [PTBR + 1] = "00";
@@ -31,7 +18,7 @@ PTLR = 4; //Every process has 4 entries in its page table
 [PTBR + 7] = "01";
 
 load(9,3); //load timer interrupt routine
-load(10,4); 
+load(10,4);
 
 [READY_LIST + 1] = 2; //the pcb of the init process states that it is running
 
@@ -40,9 +27,9 @@ SP = 3*512; //The stack pointer points to the fourth logical page (since it is u
 [28*512] = 0; //set up the IP value for init at the top of the stack
 
 load(11,5); //load interrupt 1 routine
-load(12,6); 
+load(12,6);
 
-load(5,19); //load fat 
+load(5,19); //load fat
 load(6,20); //load df
 
 alias counter S0;
@@ -75,6 +62,8 @@ while(counter < 16) do //initialize per-process open file table of the init proc
 	counter = counter + 2;
 endwhile;
 
+[READY_LIST + 31] = 0;
+
 counter = 1280; //initializing the memory free list
 while(counter<=1343) do
 	[counter] = 0;
@@ -100,12 +89,6 @@ while(counter<32) do
 endwhile;
 
 [READY_LIST + 1] = 2;
-	
+
 
 ireturn; //transfer control to the user program
-
-
-
-
-
-

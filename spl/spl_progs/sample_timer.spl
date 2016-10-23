@@ -2,7 +2,9 @@ alias currentPID S0;
 alias currentPCB S1;
 currentPID = (PTBR - 1024)/8; //pid of the current process
 currentPCB = READY_LIST + 32*currentPID; //location of the PCB of the current process
-[currentPCB + 1] = 1; //set the state to ready
+if([currentPCB + 1] == 2) then
+	[currentPCB + 1] = 1; //set the state to ready
+endif;
 [currentPCB + 2] = BP;
 [currentPCB + 3] = SP-1; //when the timer interrupt id called, SP is incremeted and stores the value of the IP. But we need the actual SP of the process afterwards
 
@@ -46,11 +48,10 @@ R7 = [newPCB + 14];
 
 SP = SP + 1;
 alias newphysicalSP S2;
-newphysicalSP = ([PTBR + 2*(SP/512)]*512) + (SP%512); 
+newphysicalSP = ([PTBR + 2*(SP/512)]*512) + (SP%512);
 [newphysicalSP] = [newPCB + 4]; //Stores the IP field value of PCB on top of the stack
 [newPCB + 1] = 2;
 
-//breakpoint;
+breakpoint;
 
 ireturn;
-

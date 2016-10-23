@@ -8,15 +8,34 @@ VPagenum = (EFR / 10) % 100;
 Ip_addr = (EFR/1000);
 
 if(Cause != 0) then
-	print (EFR % 10);
+
+	if(Cause == 1) then
+		print("Illegal");
+		print("Instruction");
+	endif;
+
+	if(Cause == 2) then
+		print("Illegal");
+		print("Memory Access");
+	endif;
+
+	if(Cause == 3) then
+		print("Arithmetic");
+		print("Exception");
+	endif;
+
+	if(Cause == 4) then
+		print("Illegal Operands");
+	endif;
+
 	alias physicalSP S8;
 	physicalSP = [PTBR + 2*(SP/512)]*512 + (SP%512);
 	[physicalSP - 1] = 10;
-	inline "JMP 23*512";
+	inline "JMP 11776";
 endif;
 
 if([PTBR + 2*VPagenum] == -1) then
-	inline "JMP 23*512";
+	inline "JMP 11776";
 endif;
 
 alias counter S4;
@@ -43,25 +62,25 @@ if(counter == 64) then							//if no free page ->  page replacement
 			if([1024 + 8*counter + 2*i + 1]=="01" && [1280 + [1024 + 8*counter + 2*i]]<=1) then		//search for valid page
 				j = 448;
 				while(j<512) do
-					if([6*512 + j]==0) then
+					if([6*512 + j]==0) then					//looking for free swap block
 						break;
 					endif;
 					j = j + 1;
 				endwhile;
 
 				if(j==512) then
-					inline "JMP 23*512";
+					inline "JMP 11776";
 				endif;
 
-				physicalpage = [1024 + 8*counter + 2*i];
+				physicalpage = [1024 + 8*counter + 2*i];			//swapping out
 				store([1024 + 8*counter + 2*i],j);
 				[6*512 + j] = 1;
-				[1024 + 8*counter + 2*i] = j;
+				[1024 + 8*counter + 2*i] = j;									//setting up page table of swapped process
 				[1024 + 8*counter + 2*i + 1] = "00";
 				break;
 			endif;
 
-			if([1024 + 8*counter + 2*i + 1]=="11") then
+			if([1024 + 8*counter + 2*i + 1]=="11") then		//2nd chance algorihtm
 				[1024 + 8*counter + 2*i + 1] = "01";
 			endif;
 			i = i + 1;
@@ -78,16 +97,16 @@ endif;
 
 alias physvpage S7;
 physvpage = [PTBR + 2*VPagenum];
-if(physvpage>=21 || physvpage <=447) then
+if(physvpage>=21 || physvpage <=447) then			//not in swap area
 	load(j,physvpage);
 endif;
 
-if(physvpage>=448) then
+if(physvpage>=448) then											//in swap area
 	load(j,physvpage);
 	[6*512 + physvpage] = [6*512 + physvpage] - 1;
 endif;
 
-[PTBR + 2*VPagenum] = j;
+[PTBR + 2*VPagenum] = j;										//setting up page table 
 [PTBR + 2*VPagenum + 1] = "11";
 
 SP = SP + 1;

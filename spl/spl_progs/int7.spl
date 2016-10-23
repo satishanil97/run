@@ -1,31 +1,42 @@
 alias i S0;
 alias physicalSP S1;
 alias sysCallNo S2;
+alias counter S3;
+alias PID S4;
+alias newPCB S5;
 
 physicalSP = [PTBR + 2*(SP/512)]*512 + (SP%512);
 sysCallNo = [physicalSP -1];
-breakpoint;
 
-if(sysCallNo == 10) then
-	alias counter S3;
+if(sysCallNo == 10) then						//Exit
+
 	counter = 0;
-	while(counter<32) do
+	PID = (PTBR - 1024)/8;
+
+
+	while(counter < 32) do
+		if([READY_LIST + 32*counter + 1] == (100 + PID)) then		//Signal waiting processes
+			[READY_LIST + 32*counter + 1] = 1;
+		endif;
+
+		counter = counter + 1;
+	endwhile;
+
+	counter = 0;
+	while(counter<32) do									//find next ready process
 		if([READY_LIST + 32*counter + 1] == 1) then
 			break;
 		endif;
 		counter = counter + 1;
 	endwhile;
 
-	if(counter == 32) then
+	if(counter == 32) then							//if no more processes to run -> halt
 		halt;
 	endif;
 
-	alias PID S4;
-	PID = (PTBR - 1024)/8;
-
 	counter = 0;
 	i = READY_LIST + 32*PID + 15;
-	while(counter < 8) do
+	while(counter < 8) do										//decrement system wide open file table
 		if([i + 2*counter] != -1) then
 			[FILE_TABLE + 2*[i + 2*counter] + 1] = [FILE_TABLE + 2*[i+2*counter] + 1] - 1;
 			if([FILE_TABLE + 2*[i + 2*counter] + 1] == 0) then
@@ -40,7 +51,7 @@ if(sysCallNo == 10) then
 	[READY_LIST + 32*PID + 1] = 0;
 
 	counter = 0;
-	while(counter < 3) do
+	while(counter < 4) do							//free pages and disk blocks
 		if([PTBR + 2*counter + 1]=="01" || [PTBR + 2*counter + 1]=="11") then
 			[1280 + [PTBR + 2*counter]] = [1280 + [PTBR + 2*counter]] - 1;
 		endif;
@@ -56,29 +67,17 @@ if(sysCallNo == 10) then
 
 	store(6,20);
 
-	counter = 0;
-
-	while(counter < 32) do
-		if([READY_LIST + 32*counter + 1] == (100 + PID)) then
-			[READY_LIST + 32*counter + 1] = 1;
-		endif;
-
-		counter = counter + 1;
-	endwhile;
-
+	breakpoint;
 	PID = (PTBR - 1024)/8;
 	counter = (PID + 1)%32;
-	while(counter !=PID) do
+	while(counter !=PID) do											//finding next ready process
 		if([READY_LIST + 32*counter + 1]==1) then
 			break;
 		endif;
 		counter = (counter + 1)%32;
 	endwhile;
 
-	breakpoint;
-
-	alias newPCB S5;
-	newPCB = counter;
+	newPCB = counter;										//setting up next process
 	i = READY_LIST + 32*newPCB;
 	BP = [i + 2];
 	SP = [i + 3];
@@ -94,16 +93,16 @@ if(sysCallNo == 10) then
 	R7 = [i + 14];
 
 	SP = SP + 1;
-	breakpoint;
 	physicalSP = [PTBR + 2*(SP/512)]*512 + (SP%512);
-	[physicalSP] = [i + 4];
+	[physicalSP] = [i + 4];										//putting IP on top of stack
 	[i + 1] = 2;
+	breakpoint;
 	ireturn;
 endif;
 
-if(sysCallNo == 13) then
-	alias waitPid S3;
-	alias pid S4;
+if(sysCallNo == 13) then						//Wait
+	alias waitPid S6;
+	alias pid S7;
 
 	waitPid = [physicalSP - 3];
 
@@ -118,16 +117,17 @@ if(sysCallNo == 13) then
 
 	[physicalSP - 2] = 0;
 
-	inline "JMP 23*512 + 248*2";
+	inline "JMP 4608";			//timer
 	ireturn;
 endif;
 
-if(sysCallNo == 14) then
-	alias pid S3;
-	alias counter S4;
+if(sysCallNo == 14) then		//Signal
+	alias pid S8;
+	alias counter S9;
 
 	pid = (PTBR- 1024)/8;
 	counter = 0;
+	breakpoint;
 
 	while(counter < 32) do
 		if([READY_LIST + 32*counter + 1] == (100 + pid)) then
@@ -138,6 +138,7 @@ if(sysCallNo == 14) then
 	endwhile;
 
 	[physicalSP - 2] = 0;
+	breakpoint;
 	ireturn;
 endif;
 
